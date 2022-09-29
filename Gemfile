@@ -4,13 +4,14 @@ git_source(:github) { |repo_name| "https://github.com/#{repo_name}.git" }
 
 source 'https://rubygems.org'
 
-gem 'activesupport', '~> 5.2', '>= 5.2.4.3'
 gem 'aws-sdk-secretsmanager', '~> 1.21'
 gem 'dotenv'
 gem 'erubi', '~> 1.8'
 gem 'faraday'
 gem 'json-jwt', '~> 1.11.0'
 gem 'jwt', '~> 2.1'
+gem 'nokogiri', '>= 1.11.0'
+gem 'puma', '~> 5.6'
 gem 'rake'
 gem 'sinatra', '~> 2.2'
 
@@ -22,9 +23,8 @@ end
 
 group :test do
   gem 'fakefs', require: 'fakefs/safe'
-  gem 'nokogiri', '>= 1.11.0'
   gem 'rack-test', '>= 1.1.0'
-  gem 'rspec', '~> 3.5.0'
+  gem 'rspec', '~> 3.11'
   gem 'webmock'
 end
 

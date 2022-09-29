@@ -41,6 +41,7 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
       expect(auth_uri_params[:prompt]).to eq('select_account')
       expect(auth_uri_params[:nonce].length).to be >= 32
       expect(auth_uri_params[:state].length).to be >= 32
+      expect(auth_uri_params[:inherited_proofing_auth]).not_to be
     end
 
     it 'pre-fills IAL2 if the URL has ?ial=2 (used in smoke tests)' do
@@ -49,7 +50,7 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
       expect(last_response).to be_ok
 
       doc = Nokogiri::HTML(last_response.body)
-      ial2_option = doc.at("select[name=ial] option[value=2]")
+      ial2_option = doc.at('select[name=ial] option[value=2]')
       expect(ial2_option[:selected]).to be
     end
 
@@ -59,8 +60,8 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
       expect(last_response).to be_ok
 
       doc = Nokogiri::HTML(last_response.body)
-      ial2_option = doc.at("select[name=aal] option[value=3]")
-      expect(ial2_option[:selected]).to be
+      aal3_option = doc.at('select[name=aal] option[value=3]')
+      expect(aal3_option[:selected]).to be
     end
 
     it 'renders an error if basic auth credentials are wrong' do
@@ -84,6 +85,25 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
       expect(last_response.body).to include(error_string)
       expect(stub).to have_been_requested.once
       expect(last_response.status).to eq 500
+    end
+
+    context 'user options' do
+      it 'adds the (VA test) inherited proofing auth URL param when selected by user' do
+        get '/'
+
+        doc = Nokogiri::HTML(last_response.body)
+
+        va_test_auth_code = doc.at('[name=ip_auth_option]').attr('value')
+
+        get '/', { ip_auth_option: va_test_auth_code }
+
+        doc = Nokogiri::HTML(last_response.body)
+        login_link = doc.at("a[href*='#{authorization_endpoint}']")
+        auth_uri = URI(login_link[:href])
+        auth_uri_params = Rack::Utils.parse_nested_query(auth_uri.query).with_indifferent_access
+
+        expect(auth_uri_params[:inherited_proofing_auth]).to eq(va_test_auth_code)
+      end
     end
   end
 
@@ -109,7 +129,7 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
       )
     end
 
-    it 'redirects to an ial1 sign in link if loa param is 1' do
+    it 'redirects to an ial1 sign in link if ial param is 1' do
       get '/auth/request?ial=1'
 
       expect(last_response).to be_redirect
@@ -136,6 +156,16 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
       expect(last_response).to be_redirect
       expect(CGI.unescape(last_response.location)).to include(
         '/ial/2?strict=true'
+      )
+    end
+
+    it 'redirects to an ial1 sign in link if ial param is step-up' do
+      get '/auth/request?ial=step-up'
+
+      expect(last_response).to be_redirect
+      expect(last_response.location).to include('scope=openid+email')
+      expect(last_response.location).to_not include(
+        'scope=openid+email+profile+social_security_number+phone+address'
       )
     end
 
@@ -234,7 +264,7 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
       get '/auth/result', error: 'access_denied'
 
       expect(last_response).to be_redirect
-      uri = URI::parse(last_response.location)
+      uri = URI.parse(last_response.location)
       expect(uri.path).to eq('/')
       expect(uri.query).to eq('error=access_denied')
       follow_redirect!
@@ -257,7 +287,7 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
             acr: 'http://idmanagement.gov/ns/assurance/loa/3',
             social_security_number: '012-34-5678',
             phone: '0125551212',
-            address: '123 Main St., Anytown, US 12345'
+            address: '123 Main St., Anytown, US 12345',
           },
           idp_private_key,
           'RS256'
@@ -299,7 +329,7 @@ RSpec.describe LoginGov::OidcSinatra::OpenidConnectRelyingParty do
             email: email,
             acr: 'http://idmanagement.gov/ns/assurance/loa/3',
             phone: '0125551212',
-            address: '123 Main St., Anytown, US 12345'
+            address: '123 Main St., Anytown, US 12345',
           },
           idp_private_key,
           'RS256'
